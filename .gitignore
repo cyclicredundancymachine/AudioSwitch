@@ -1,0 +1,8 @@
+src/bin/
+src/obj/
+tray/bin/
+tray/obj/
+dist/
+reference/
+evidence/
+/dist-refresh/
