@@ -34,7 +34,7 @@ internal sealed class Popup : Form
     private readonly TrayClicks trayClicks;
     private string trayStatus = "Reading audio status…";
     private readonly System.Windows.Forms.Timer timer = new() { Interval = 2000 };
-    private readonly Label current = new() { AutoSize = true };
+    private readonly Label current = new() { AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly Label status = new() { AutoSize = true, MaximumSize = new Size(355, 0) };
     private readonly Button bluetooth = new() { AutoSize = true };
     private readonly FlowLayoutPanel devices = new() { AutoScroll = true, WrapContents = false, FlowDirection = FlowDirection.TopDown, Dock = DockStyle.Fill };
@@ -54,20 +54,24 @@ internal sealed class Popup : Form
         Text = "AudioSwitch";
         Icon = audioIcon;
         icon.Icon = audioIcon;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.Manual;
+        AutoScaleDimensions = new SizeF(96, 96);
+        AutoScaleMode = AutoScaleMode.Dpi;
         ClientSize = new Size(468, 560);
+        MinimumSize = new Size(340, 330);
         BackColor = Canvas;
         ForeColor = Ink;
         TopMost = true;
 
         var header = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
             WrapContents = false, Padding = new Padding(14, 10, 14, 10), BackColor = Hero };
-        header.SizeChanged += (_, _) => current.MaximumSize = new Size(Math.Max(1, header.ClientSize.Width - header.Padding.Horizontal - current.Margin.Horizontal), 0);
+        header.SizeChanged += (_, _) => current.Width = Math.Max(1, header.ClientSize.Width - header.Padding.Horizontal - current.Margin.Horizontal);
         header.Controls.Add(new Label { Text = "CURRENT OUTPUT", AutoSize = true, ForeColor = Color.FromArgb(159, 222, 210) });
         current.Font = new Font(Font.FontFamily, 13, FontStyle.Bold);
+        current.Height = current.Font.Height + 4;
         current.ForeColor = Color.White;
         current.Margin = new Padding(3, 3, 3, 8);
         header.Controls.Add(current);
@@ -80,6 +84,11 @@ internal sealed class Popup : Form
         var footer = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown };
         footer.Controls.Add(status);
         var links = new FlowLayoutPanel { AutoSize = true };
+        footer.SizeChanged += (_, _) => {
+            int width = Math.Max(1, footer.ClientSize.Width - links.Margin.Horizontal);
+            links.MaximumSize = new Size(width, 0);
+            status.MaximumSize = new Size(width, 0);
+        };
         var manage = new Button { Text = "Device list", AutoSize = true };
         StyleButton(manage);
         manage.Click += (_, _) => ManageDevices();
@@ -106,6 +115,9 @@ internal sealed class Popup : Form
         layout.Controls.Add(devices, 0, 1);
         layout.Controls.Add(footer, 0, 2);
         Controls.Add(layout);
+        devices.ClientSizeChanged += (_, _) => {
+            foreach (var button in devices.Controls.OfType<Button>()) button.Width = DeviceButtonWidth();
+        };
 
         icon.ContextMenuStrip = new ContextMenuStrip();
         icon.ContextMenuStrip.Items.Add("Open AudioSwitch", null, async (_, _) => await ShowPopup());
@@ -161,8 +173,11 @@ internal sealed class Popup : Form
     internal async Task ShowPopup()
     {
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
-        Location = new Point(area.Right - Width - 8, area.Bottom - Height - 8);
+        // Position on the target monitor before fitting to its work area and DPI.
+        Location = new Point(Math.Max(area.Left, area.Right - Width - 8), Math.Max(area.Top, area.Bottom - Height - 8));
         Show();
+        Size = new Size(Math.Min(Width, area.Width), Math.Min(Height, area.Height));
+        Location = new Point(Math.Max(area.Left, area.Right - Width - 8), Math.Max(area.Top, area.Bottom - Height - 8));
         Activate();
         await RefreshSnapshot();
     }
@@ -226,6 +241,7 @@ internal sealed class Popup : Form
     {
         var output = snapshot.Defaults.ElementAtOrDefault(1);
         current.Text = snapshot.Endpoints.FirstOrDefault(e => e.Id == output)?.Name ?? "No default output";
+        deviceTips.SetToolTip(current, current.Text);
         var radio = snapshot.Radios.FirstOrDefault(r => r.State == "On") ?? snapshot.Radios.FirstOrDefault();
         bluetooth.Text = radio is null ? "Bluetooth unavailable" : $"Bluetooth: {radio.State}";
         bluetooth.Enabled = radio?.State is "On" or "Off";
@@ -441,13 +457,16 @@ internal sealed class Popup : Form
         button.ForeColor = Ink;
     }
 
+    private int DeviceButtonWidth() =>
+        Math.Max(1, devices.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - LogicalToDeviceUnits(12));
+
     private void ActionButton(string text, Func<Task> action, bool enabled = true, bool selected = false)
     {
         var button = new Button
         {
             Text = text,
-            Width = Math.Max(100, devices.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 12),
-            Height = 35,
+            Width = DeviceButtonWidth(),
+            Height = Math.Max(LogicalToDeviceUnits(35), Font.Height + LogicalToDeviceUnits(10)),
             Padding = new Padding(6, 0, 6, 0),
             TextAlign = ContentAlignment.MiddleLeft,
             Enabled = enabled,

@@ -2,6 +2,7 @@ AUDIOSWITCH
 
 Double-click the tray icon to open AudioSwitch. Under Playback outputs, click Use
 beside an available device to select it, even if Windows connected it first.
+Drag a window edge to resize. Hover over the current output to see its full name.
 For a disconnected paired headset, use Connect to connect and select it.
 Pair new devices through Windows Settings. Sound settings opens Windows audio settings.
 
