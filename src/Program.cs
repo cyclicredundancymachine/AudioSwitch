@@ -47,5 +47,7 @@ try
 catch (Exception ex)
 {
     Console.Error.WriteLine($"FAILED 0x{ex.HResult:X8}: {ex.Message}");
+    if (Environment.GetEnvironmentVariable("AUDIOSWITCH_DIAGNOSTICS") == "1")
+        Console.Error.WriteLine(ex);
     return 1;
 }

@@ -51,6 +51,11 @@ internal static class Audio
                         connector.GetDeviceIdConnectedTo(out filter);
                     }
                     catch (COMException) { }
+                    catch (InvalidCastException ex) when (ex.HResult == unchecked((int)0x80004002))
+                    {
+                        // Some endpoints expose playback but no topology interface.
+                        // Keep the endpoint available without a Bluetooth connection filter.
+                    }
                     result.Add(new Endpoint(id, name, container, state, filter));
                 }
                 finally { Release(connector); Release(topologyObject); Release(store); Release(device); }
