@@ -22,10 +22,10 @@ internal static class Program
 internal sealed class Popup : Form
 {
     private static readonly Color Ink = Color.FromArgb(23, 42, 58);
-    private static readonly Color Canvas = Color.FromArgb(241, 246, 250);
+    private static readonly Color Canvas = Color.FromArgb(245, 248, 250);
     private static readonly Color Accent = Color.FromArgb(14, 105, 86);
-    private static readonly Color Border = Color.FromArgb(193, 211, 224);
-    private static readonly Color Hero = Color.FromArgb(22, 48, 66);
+    private static readonly Color Border = Color.FromArgb(211, 222, 229);
+    private static readonly Color Hero = Color.FromArgb(24, 45, 62);
     private readonly ToolTip deviceTips = new() { ShowAlways = true };
     private readonly Icon audioIcon = CreateAudioIcon(Hero);
     private readonly Icon bluetoothOnIcon = CreateAudioIcon(Color.FromArgb(23, 93, 197));
@@ -37,6 +37,11 @@ internal sealed class Popup : Form
     private readonly Label current = new() { AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly Label status = new() { AutoSize = true, MaximumSize = new Size(355, 0) };
     private readonly Button bluetooth = new() { AutoSize = true };
+    private readonly TrackBar volume = new() { Minimum = 0, Maximum = 100, TickStyle = TickStyle.None,
+        AutoSize = false, Height = 30, Dock = DockStyle.Fill, SmallChange = 1, LargeChange = 5,
+        AccessibleName = "Playback output volume", BackColor = Hero, Enabled = false };
+    private readonly Button mute = new() { AutoSize = true, Width = 50, Text = "Mute", Enabled = false };
+
     private readonly FlowLayoutPanel devices = new() { AutoScroll = true, WrapContents = false, FlowDirection = FlowDirection.TopDown, Dock = DockStyle.Fill };
     private readonly CancellationTokenSource lifetime = new();
     private readonly string visibilityPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AudioSwitch", "hidden-devices.json");
@@ -60,23 +65,36 @@ internal sealed class Popup : Form
         StartPosition = FormStartPosition.Manual;
         AutoScaleDimensions = new SizeF(96, 96);
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(468, 560);
+        ClientSize = new Size(468, 500);
         MinimumSize = new Size(340, 330);
         BackColor = Canvas;
         ForeColor = Ink;
         TopMost = true;
 
         var header = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, Padding = new Padding(14, 10, 14, 10), BackColor = Hero };
+            WrapContents = false, Padding = new Padding(12, 8, 12, 8), BackColor = Hero };
         header.SizeChanged += (_, _) => current.Width = Math.Max(1, header.ClientSize.Width - header.Padding.Horizontal - current.Margin.Horizontal);
-        header.Controls.Add(new Label { Text = "CURRENT OUTPUT", AutoSize = true, ForeColor = Color.FromArgb(159, 222, 210) });
+        header.Controls.Add(new Label { Text = "Current output", AutoSize = true, ForeColor = Color.FromArgb(159, 222, 210) });
         current.Font = new Font(Font.FontFamily, 13, FontStyle.Bold);
         current.Height = current.Font.Height + 4;
         current.ForeColor = Color.White;
-        current.Margin = new Padding(3, 3, 3, 8);
+        current.Margin = new Padding(3, 2, 3, 4);
         header.Controls.Add(current);
         StyleButton(bluetooth);
-        header.Controls.Add(bluetooth);
+        StyleButton(mute);
+        var audioControls = new TableLayoutPanel { AutoSize = false, Height = 36, ColumnCount = 3,
+            Margin = Padding.Empty, GrowStyle = TableLayoutPanelGrowStyle.FixedSize, RowCount = 1 };
+        audioControls.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        audioControls.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        audioControls.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        audioControls.Controls.Add(bluetooth, 0, 0);
+        audioControls.Controls.Add(mute, 1, 0);
+        audioControls.Controls.Add(volume, 2, 0);
+        header.SizeChanged += (_, _) => audioControls.Width = Math.Max(1, header.ClientSize.Width - header.Padding.Horizontal);
+        header.Controls.Add(audioControls);
+        volume.Scroll += (_, _) => ChangeVolume(volume.Value, null);
+        mute.Click += (_, _) => ChangeVolume(null, null);
+        deviceTips.SetToolTip(volume, "Volume of the current Windows playback output");
         current.Text = "Reading current output…";
         bluetooth.Text = "Bluetooth";
         bluetooth.Enabled = false;
@@ -89,22 +107,34 @@ internal sealed class Popup : Form
             links.MaximumSize = new Size(width, 0);
             status.MaximumSize = new Size(width, 0);
         };
-        var manage = new Button { Text = "Device list", AutoSize = true };
+        var manage = new Button { Text = "Devices", AutoSize = true };
         StyleButton(manage);
         manage.Click += (_, _) => ManageDevices();
         links.Controls.Add(manage);
-        var settings = new Button { Text = "Sound settings", AutoSize = true };
+        var settings = new Button { Text = "Sound", AutoSize = true };
         StyleButton(settings);
         settings.Click += (_, _) => OpenSettings();
         var exit = new Button { Text = "Exit", AutoSize = true };
         StyleButton(exit);
         exit.Click += (_, _) => Exit();
         links.Controls.Add(settings);
+        var bluetoothSettings = new Button { Text = "Bluetooth", AutoSize = true };
+        StyleButton(bluetoothSettings);
+        bluetoothSettings.Click += (_, _) => OpenBluetoothSettings();
+        deviceTips.SetToolTip(bluetoothSettings, "Open Bluetooth settings");
+        links.Controls.Add(bluetoothSettings);
         var help = new Button { Text = "Help", AutoSize = true };
         StyleButton(help);
         help.Click += (_, _) => OpenReadme();
         links.Controls.Add(help);
         links.Controls.Add(exit);
+        foreach (var button in links.Controls.OfType<Button>())
+        {
+            button.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            button.MinimumSize = Size.Empty;
+            button.Padding = new Padding(3, 1, 3, 1);
+            button.Margin = new Padding(2, 3, 2, 3);
+        }
         footer.Controls.Add(links);
 
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), RowCount = 3, ColumnCount = 1 };
@@ -187,14 +217,49 @@ internal sealed class Popup : Form
         if (busy || refreshing || exiting) return;
         refreshing = true;
         try { await ReadSnapshot(operationVersion); }
-        finally { refreshing = false; }
+        finally
+        {
+            refreshing = false;
+            if (Visible && !exiting) RefreshVolume();
+        }
+    }
+
+    private void RefreshVolume()
+    {
+        if (volume.Capture) return;
+        try { ShowVolume(OutputVolume.Read()); }
+        catch (Exception ex) when (ex is COMException or InvalidCastException)
+        {
+            volume.Enabled = mute.Enabled = false;
+            deviceTips.SetToolTip(volume, "Volume unavailable: " + ex.Message);
+        }
+    }
+
+    private void ChangeVolume(int? percent, bool? muted)
+    {
+        try { ShowVolume(percent.HasValue ? OutputVolume.Set(percent, muted) : OutputVolume.ToggleMute()); }
+        catch (Exception ex) when (ex is COMException or InvalidCastException)
+        {
+            status.Text = "Could not change output volume: " + ex.Message;
+            RefreshVolume();
+        }
+    }
+
+    private void ShowVolume(OutputVolume.State value)
+    {
+        volume.Value = Math.Clamp(value.Percent, 0, 100);
+
+        mute.Text = value.Muted ? "Unmute" : "Mute";
+        volume.Enabled = mute.Enabled = true;
+        deviceTips.SetToolTip(volume, "Volume of the current Windows playback output");
     }
 
     private async Task ReadSnapshot(int version)
     {
         try
         {
-            var snapshot = await Task.Run(Inspect);
+            var snapshot = JsonSerializer.Deserialize<Snapshot>(await RunWorker("inspect"))
+                ?? throw new InvalidOperationException("Audio inspection returned no state.");
             if (exiting || version != operationVersion) return;
             latest = snapshot;
             string signature = JsonSerializer.Serialize(snapshot);
@@ -221,22 +286,6 @@ internal sealed class Popup : Form
         catch (Exception) when (exiting) { }
     }
 
-    private static async Task<Snapshot> Inspect()
-    {
-        var radioInfo = new List<Radio>();
-        foreach (var item in await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(Windows.Devices.Radios.Radio.GetDeviceSelector()))
-        {
-            var radio = await Windows.Devices.Radios.Radio.FromIdAsync(item.Id);
-            if (radio?.Kind == Windows.Devices.Radios.RadioKind.Bluetooth)
-                radioInfo.Add(new Radio(item.Id, radio.Name, radio.State.ToString()));
-        }
-        var endpoints = Audio.Endpoints().Select(ToEndpoint).ToArray();
-        var paired = (await Bluetooth.Paired()).Select(p => new Paired(p.Id, p.Name, p.Endpoints.Select(ToEndpoint).ToArray())).ToArray();
-        return new Snapshot(radioInfo.ToArray(), Audio.Defaults(), endpoints, paired);
-    }
-
-    private static Endpoint ToEndpoint(global::AudioSwitch.Endpoint endpoint) => new(endpoint.Id, endpoint.Name, (int)endpoint.State);
-
     private void Render(Snapshot snapshot)
     {
         var output = snapshot.Defaults.ElementAtOrDefault(1);
@@ -254,30 +303,28 @@ internal sealed class Popup : Form
         try
         {
             ClearDevices();
-            Heading("PLAYBACK OUTPUTS", section: true);
-            devices.Controls.Add(new Label { Text = "Click an available output to use it.", AutoSize = true,
-                ForeColor = Color.FromArgb(66, 89, 106), Margin = new Padding(4, 0, 4, 5) });
+            Heading("Available outputs", section: true);
             foreach (var endpoint in snapshot.Endpoints.Where(e => e.State == 1 && !hidden.ContainsKey(DeviceKey(snapshot, e))))
             {
                 bool selected = endpoint.Id == output;
                 ActionButton((selected ? "✓  " : "Use  ·  ") + endpoint.Name,
                     () => Act("Playback output selected.", "switch", endpoint.Id), !selected, selected);
             }
-            Heading("PAIRED BLUETOOTH", section: true);
+            Heading("Paired Bluetooth", section: true);
             if (snapshot.PairedAudio.Length == 0) Heading("No paired audio devices found.");
             foreach (var paired in snapshot.PairedAudio.Where(p => !hidden.ContainsKey("paired:" + p.Id)))
             {
                 var active = paired.Endpoints.Where(e => e.State == 1).ToArray();
                 var candidates = paired.Endpoints.Where(e => e.State is 1 or 8).ToArray();
-                string state = active.Length > 0 ? "Connected" : candidates.Length > 0 ? "Disconnected" : "Unavailable";
-                Heading($"{paired.Name}  ·  {state}");
                 if (active.Length > 0)
-                    ActionButton("Disconnect " + paired.Name, () => Act("Playback disconnected.", "disconnect", paired.Id), active.Length == 1);
+                    ActionButton("Disconnect  ·  " + paired.Name, () => Act("Playback disconnected.", "disconnect", paired.Id), active.Length == 1);
+                else if (candidates.Length == 0)
+                    ActionButton("Unavailable  ·  " + paired.Name, () => Task.CompletedTask, enabled: false);
                 else
                     foreach (var endpoint in candidates)
                     {
                         string name = candidates.Length == 1 ? paired.Name : endpoint.Name;
-                        ActionButton("Connect " + name, () => Connect(radio, paired.Id, endpoint.Id));
+                        ActionButton("Connect  ·  " + name, () => Connect(radio, paired.Id, endpoint.Id));
                     }
             }
         }
@@ -315,11 +362,24 @@ internal sealed class Popup : Form
         var list = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, HorizontalScrollbar = true };
         var ordered = entries.OrderBy(e => e.Value, StringComparer.CurrentCultureIgnoreCase).ToArray();
         foreach (var item in ordered) list.Items.Add(item.Value, !hidden.ContainsKey(item.Key));
-        var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
+        var buttons = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true,
+            ColumnCount = 3, RowCount = 1, Padding = new Padding(0, 4, 0, 4) };
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var save = new Button { Text = "Save", DialogResult = DialogResult.OK };
         var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel };
-        buttons.Controls.Add(save);
-        buttons.Controls.Add(cancel);
+        foreach (var button in new[] { save, cancel })
+        {
+            button.AutoSize = true;
+            button.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            button.MinimumSize = new Size(75, 30);
+            button.Padding = new Padding(8, 3, 8, 3);
+            button.Anchor = AnchorStyles.None;
+            button.TextAlign = ContentAlignment.MiddleCenter;
+        }
+        buttons.Controls.Add(cancel, 1, 0);
+        buttons.Controls.Add(save, 2, 0);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8) };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -445,7 +505,7 @@ internal sealed class Popup : Form
     private void Heading(string text, bool section = false) => devices.Controls.Add(new Label
     {
         Text = text, AutoSize = true, ForeColor = section ? Accent : Ink,
-        Margin = section ? new Padding(4, 12, 4, 5) : new Padding(4, 7, 4, 3),
+        Margin = section ? new Padding(4, 9, 4, 3) : new Padding(4, 4, 4, 2),
     });
 
     private static void StyleButton(Button button, bool selected = false)
@@ -466,8 +526,10 @@ internal sealed class Popup : Form
         {
             Text = text,
             Width = DeviceButtonWidth(),
-            Height = Math.Max(LogicalToDeviceUnits(35), Font.Height + LogicalToDeviceUnits(10)),
-            Padding = new Padding(6, 0, 6, 0),
+            Height = Math.Max(LogicalToDeviceUnits(28), Font.Height + LogicalToDeviceUnits(8)),
+            Margin = new Padding(LogicalToDeviceUnits(3), LogicalToDeviceUnits(1),
+                LogicalToDeviceUnits(3), LogicalToDeviceUnits(2)),
+            Padding = new Padding(LogicalToDeviceUnits(7), 0, LogicalToDeviceUnits(7), 0),
             TextAlign = ContentAlignment.MiddleLeft,
             Enabled = enabled,
             AutoEllipsis = true
@@ -486,6 +548,12 @@ internal sealed class Popup : Form
     private void OpenSettings()
     {
         try { Process.Start(new ProcessStartInfo("ms-settings:sound") { UseShellExecute = true })?.Dispose(); }
+        catch (Exception ex) { status.Text = ex.Message; }
+    }
+
+    private void OpenBluetoothSettings()
+    {
+        try { Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true })?.Dispose(); }
         catch (Exception ex) { status.Text = ex.Message; }
     }
 

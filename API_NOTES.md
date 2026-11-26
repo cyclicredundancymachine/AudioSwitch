@@ -2,6 +2,9 @@
 
 ## Supported Windows interfaces
 
+- `tray/OutputVolume.cs` uses Core Audio `IAudioEndpointVolume` for the current multimedia render endpoint. Each volume or mute gesture resolves the current output, writes its master volume or mute, and reads the result back. Periodic reads synchronize the controls while the window is open. Refresh never writes volume.
+- Endpoints without the optional device topology interface remain visible for playback selection. Bluetooth reconnect requires an endpoint that exposes a connection filter.
+
 - WinRT Radio enumeration, RequestAccessAsync, SetStateAsync, and observed State: Bluetooth radio control. Hardware switches, policy, and adapter availability can prevent success.
 - WinRT BluetoothDevice paired association-endpoint selector: existing classic Bluetooth devices only. Container IDs correlate paired devices to Core Audio render endpoints; names are never used as identity.
 - Core Audio IMMDeviceEnumerator, property stores, and IDeviceTopology: enumerate playback endpoints and inspect state/default roles. Missing or ambiguous associations fail closed. Paired audio devices without matching installed endpoints are currently omitted; LE Audio coverage is unverified.
@@ -23,3 +26,9 @@ Default-output selection uses the undocumented IPolicyConfig COM interface, isol
 ## Code provenance
 
 CoreAudio.cs is reused from [chrispoulter/bluetooth-audio-switch](https://github.com/chrispoulter/bluetooth-audio-switch), commit `0e1407c265ceb4379768d7b67c861385e957a85f`, under MIT; see THIRD-PARTY-LICENSE.txt. Connection research also examined [ToothTray](https://github.com/m2jean/ToothTray). Other prototype files implement render-only operations, explicit selection, and verification locally.
+
+## Review recovery behavior (November 27, 2026)
+
+Inspection now runs in the helper with the same 12-second deadline as other short commands. This also bounds the refresh after a failed device operation. A timed-out helper is terminated; the next poll can retry. The tray rejects inspection results from before a newer operation. Mute reads the current endpoint's mute flag immediately before toggling it. Periodic volume reads wait while the slider holds mouse capture.
+
+Volume COM calls still run synchronously on the UI thread. A driver that blocks those calls can freeze the popup; the worker deadline does not cover volume. Resolving an endpoint and writing to it is not atomic with an external default-output switch. The selected endpoint receives the gesture; polling later follows the new default. Do not retry a write against another output automatically.
