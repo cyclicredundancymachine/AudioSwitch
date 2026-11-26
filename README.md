@@ -12,7 +12,7 @@ Open dist\AudioSwitchTray.exe. It opens the popup and adds AudioSwitch to the Wi
 
 Select a playback output directly, or use Connect under Paired Bluetooth to connect and select a paired device. Device state refreshes inside the app every two seconds while open and every five seconds in the tray. Sound opens Windows audio settings; Bluetooth opens Windows Bluetooth settings. Help opens the short README.
 
-To share AudioSwitch, copy the whole folder to a compatible Windows x64 PC. Keep AudioSwitchTray.exe, AudioSwitch.exe, README.txt, and THIRD-PARTY-LICENSE.txt together. Open AudioSwitchTray.exe. Device preferences and sign-in startup are set separately per PC. The tray app calls the latter as its device helper. Both are self-contained Windows x64 builds. Build the helper using the command below, then publish the tray from the project directory:
+To share AudioSwitch, copy the whole folder to a compatible Windows x64 PC. Keep AudioSwitchTray.exe, AudioSwitch.exe, README.txt, LICENSE, and THIRD-PARTY-LICENSE.txt together. Open AudioSwitchTray.exe. Device preferences and sign-in startup are set separately per PC. The tray app calls the latter as its device helper. Both are self-contained Windows x64 builds. Build the helper using the command below, then publish the tray from the project directory:
 
     dotnet publish tray\AudioSwitchTray.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:Version=1.1.0 -o dist
 
@@ -63,3 +63,8 @@ Inspection runs in the helper with a 12-second deadline, including recovery refr
 Mute toggles the current output's live mute state; periodic volume refresh waits
 while dragging the slider. See CODE_REVIEW.md for the current validation evidence
 and remaining hardware/scaling coverage. Setup and portable packages share the same binaries.
+
+
+## License
+
+The original application code is MIT licensed; see [LICENSE](LICENSE). The Core Audio interop retains its third-party MIT notice in THIRD-PARTY-LICENSE.txt.

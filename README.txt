@@ -31,3 +31,6 @@ Exit AudioSwitch before installing an update. Setup adds a Start menu shortcut
 and an uninstall entry. It preserves device preferences and does not enable
 sign-in startup. Choose the existing app folder to upgrade a portable copy.
 Uninstall through Windows Installed apps; saved preferences are retained.
+
+LICENSE
+The application is MIT licensed. Keep LICENSE with redistributed copies.

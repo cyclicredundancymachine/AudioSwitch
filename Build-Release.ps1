@@ -9,8 +9,8 @@ foreach($project in @('src\AudioSwitch.csproj','tray\AudioSwitchTray.csproj')){
     & dotnet publish (Join-Path $PSScriptRoot $project) -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true "-p:Version=$version" -o $payload
     if($LASTEXITCODE -ne 0){throw "Publish failed: $project"}
 }
-$names=@('AudioSwitch.exe','AudioSwitchTray.exe','README.txt','THIRD-PARTY-LICENSE.txt')
-Copy-Item (Join-Path $PSScriptRoot 'README.txt'),(Join-Path $PSScriptRoot 'THIRD-PARTY-LICENSE.txt') $payload -Force
+$names=@('AudioSwitch.exe','AudioSwitchTray.exe','README.txt','LICENSE','THIRD-PARTY-LICENSE.txt')
+Copy-Item (Join-Path $PSScriptRoot 'README.txt'),(Join-Path $PSScriptRoot 'LICENSE'),(Join-Path $PSScriptRoot 'THIRD-PARTY-LICENSE.txt') $payload -Force
 $zip=Join-Path $release "AudioSwitch-v$version-win-x64.zip"
 Compress-Archive -Path ($names | ForEach-Object {Join-Path $payload $_}) -DestinationPath $zip -Force
 & $IsccPath "/DAppVersion=$version" "/DPayloadDir=$payload" "/DReleaseDir=$release" (Join-Path $PSScriptRoot 'installer\Setup.iss')

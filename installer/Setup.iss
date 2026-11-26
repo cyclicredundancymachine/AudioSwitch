@@ -42,6 +42,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 Source: "{#PayloadDir}\AudioSwitchTray.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\AudioSwitch.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\README.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PayloadDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\THIRD-PARTY-LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
